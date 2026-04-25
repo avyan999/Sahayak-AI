@@ -1,0 +1,205 @@
+import { useState, useEffect } from 'react'
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet'
+import { collection, query, onSnapshot, orderBy } from 'firebase/firestore'
+import { db } from '../firebase'
+import 'leaflet/dist/leaflet.css'
+import './MapView.css'
+
+const PRIORITY_COLORS = {
+  high: '#ef4444',
+  medium: '#f59e0b',
+  low: '#22c55e',
+}
+
+const PROBLEM_ICONS = {
+  food: '🍽️', medical: '🚑', disaster: '🌊', shelter: '🏠',
+  water: '💧', education: '📚', other: '📌',
+}
+
+// Fallback locations for cases without lat/lng (India coords)
+const INDIA_CITIES = [
+  { lat: 19.076, lng: 72.877 }, // Mumbai
+  { lat: 28.613, lng: 77.209 }, // Delhi
+  { lat: 12.971, lng: 77.594 }, // Bangalore
+  { lat: 22.572, lng: 88.363 }, // Kolkata
+  { lat: 17.385, lng: 78.486 }, // Hyderabad
+  { lat: 13.083, lng: 80.270 }, // Chennai
+  { lat: 23.022, lng: 72.571 }, // Ahmedabad
+  { lat: 18.520, lng: 73.856 }, // Pune
+]
+
+function MapUpdater({ center }) {
+  const map = useMap()
+  useEffect(() => {
+    if (center) map.setView(center, 8, { animate: true })
+  }, [center, map])
+  return null
+}
+
+export default function MapView() {
+  const [cases, setCases] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('all')
+  const [selectedCase, setSelectedCase] = useState(null)
+  const [mapCenter, setMapCenter] = useState([20.593, 78.962]) // India center
+
+  useEffect(() => {
+    const q = query(collection(db, 'cases'), orderBy('createdAt', 'desc'))
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const casesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      setCases(casesData)
+      setLoading(false)
+    }, (err) => {
+      console.error(err)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  const filtered = filter === 'all' ? cases : cases.filter(c => c.priority === filter)
+
+  // Assign fallback coordinates to cases without lat/lng
+  const casesWithCoords = filtered.map((c, i) => ({
+    ...c,
+    _lat: c.lat ? parseFloat(c.lat) : INDIA_CITIES[i % INDIA_CITIES.length].lat + (Math.random() - 0.5) * 2,
+    _lng: c.lng ? parseFloat(c.lng) : INDIA_CITIES[i % INDIA_CITIES.length].lng + (Math.random() - 0.5) * 2,
+  }))
+
+  const stats = {
+    total: cases.length,
+    high: cases.filter(c => c.priority === 'high').length,
+    medium: cases.filter(c => c.priority === 'medium').length,
+    low: cases.filter(c => c.priority === 'low').length,
+  }
+
+  return (
+    <div className="map-page page-wrapper">
+      {/* Sidebar */}
+      <div className="map-sidebar">
+        <div className="map-sidebar-header">
+          <h2 className="map-title">🗺️ Case Map</h2>
+          <p className="text-sm text-muted">Real-time field overview</p>
+        </div>
+
+        {/* Stats */}
+        <div className="map-stats">
+          <div className="map-stat"><span className="ms-dot high" />High <strong>{stats.high}</strong></div>
+          <div className="map-stat"><span className="ms-dot medium" />Medium <strong>{stats.medium}</strong></div>
+          <div className="map-stat"><span className="ms-dot low" />Low <strong>{stats.low}</strong></div>
+        </div>
+
+        {/* Filters */}
+        <div className="map-filters">
+          {['all', 'high', 'medium', 'low'].map(f => (
+            <button
+              key={f}
+              className={`filter-chip ${filter === f ? 'active' : ''}`}
+              onClick={() => setFilter(f)}
+            >
+              {f === 'all' ? '🌐 All' : f === 'high' ? '🔴 High' : f === 'medium' ? '🟡 Medium' : '🟢 Low'}
+            </button>
+          ))}
+        </div>
+
+        {/* Case list */}
+        <div className="map-case-list">
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 24 }}><div className="spinner" /></div>
+          ) : casesWithCoords.length === 0 ? (
+            <div className="text-muted text-sm" style={{ padding: 16 }}>No cases to display.</div>
+          ) : (
+            casesWithCoords.map(c => (
+              <div
+                key={c.id}
+                className={`map-case-item ${selectedCase?.id === c.id ? 'selected' : ''}`}
+                onClick={() => {
+                  setSelectedCase(c)
+                  setMapCenter([c._lat, c._lng])
+                }}
+              >
+                <div className="mci-top">
+                  <span>{PROBLEM_ICONS[c.problem_type]} {c.problem_type}</span>
+                  <span className={`badge badge-${c.priority}`}>{c.priority}</span>
+                </div>
+                <div className="mci-loc">📍 {c.location}</div>
+                <div className="mci-meta">👥 {c.people_affected} · ⚡ {c.urgency}/5</div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Map */}
+      <div className="map-container-wrapper">
+        {loading ? (
+          <div className="map-loading">
+            <div className="spinner" />
+            <p>Loading map data…</p>
+          </div>
+        ) : (
+          <MapContainer
+            center={mapCenter}
+            zoom={5}
+            style={{ height: '100%', width: '100%' }}
+            className="leaflet-map"
+          >
+            <MapUpdater center={mapCenter} />
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {casesWithCoords.map(c => (
+              <CircleMarker
+                key={c.id}
+                center={[c._lat, c._lng]}
+                radius={Math.max(8, Math.min(30, c.people_affected / 5))}
+                pathOptions={{
+                  color: PRIORITY_COLORS[c.priority],
+                  fillColor: PRIORITY_COLORS[c.priority],
+                  fillOpacity: 0.7,
+                  weight: 2,
+                }}
+                eventHandlers={{
+                  click: () => {
+                    setSelectedCase(c)
+                    setMapCenter([c._lat, c._lng])
+                  }
+                }}
+              >
+                <Popup className="custom-popup">
+                  <div className="popup-content">
+                    <div className="popup-header">
+                      <span>{PROBLEM_ICONS[c.problem_type]}</span>
+                      <strong>{c.problem_type?.charAt(0).toUpperCase() + c.problem_type?.slice(1)}</strong>
+                      <span className={`badge badge-${c.priority}`}>{c.priority}</span>
+                    </div>
+                    <div className="popup-row">📍 {c.location}</div>
+                    <div className="popup-row">👥 {c.people_affected} people affected</div>
+                    <div className="popup-row">⚡ Urgency: {c.urgency}/5</div>
+                    <div className="popup-row">📊 Score: {c.priorityScore}</div>
+                    {c.description && <div className="popup-desc">{c.description}</div>}
+                    <div className={`popup-status badge-${c.status === 'in_progress' ? 'inprogress' : c.status}`}
+                      style={{ marginTop: 8, padding: '4px 10px', borderRadius: 'var(--radius-full)', display: 'inline-block', fontSize: '0.75rem', fontWeight: 600 }}>
+                      {c.status === 'in_progress' ? '⚡ In Progress' : c.status === 'completed' ? '✅ Completed' : '⏳ Pending'}
+                    </div>
+                  </div>
+                </Popup>
+              </CircleMarker>
+            ))}
+          </MapContainer>
+        )}
+
+        {/* Legend */}
+        <div className="map-legend">
+          <div className="legend-title">Priority Legend</div>
+          <div className="legend-item"><span className="legend-dot" style={{ background: '#ef4444' }} />High Priority</div>
+          <div className="legend-item"><span className="legend-dot" style={{ background: '#f59e0b' }} />Medium Priority</div>
+          <div className="legend-item"><span className="legend-dot" style={{ background: '#22c55e' }} />Low Priority</div>
+          <div className="legend-note">Circle size = people affected</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+

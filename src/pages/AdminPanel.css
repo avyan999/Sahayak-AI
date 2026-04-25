@@ -1,0 +1,91 @@
+.admin-section {
+  padding: 24px;
+}
+
+.admin-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+}
+
+/* Volunteer roster chips */
+.vol-roster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.vol-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  transition: var(--transition);
+}
+
+.vol-chip:hover {
+  border-color: var(--border-accent);
+  background: rgba(14,165,233,0.05);
+}
+
+.vol-chip-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(14, 165, 233, 0.2);
+  color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.vol-chip-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.vol-chip-loc {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.vol-chip-skills {
+  font-size: 0.7rem;
+  color: var(--accent-primary);
+  margin-top: 2px;
+}
+
+/* Table enhancements */
+.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sortable:hover {
+  color: var(--accent-primary);
+}
+
+.score-chip {
+  background: rgba(14, 165, 233, 0.1);
+  color: var(--accent-primary);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.vol-assigned {
+  font-size: 0.825rem;
+  color: var(--priority-low);
+  font-weight: 500;
+}
