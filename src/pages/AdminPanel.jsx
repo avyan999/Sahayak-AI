@@ -50,7 +50,10 @@ export default function AdminPanel() {
   const filtered = cases
     .filter(c => {
       if (filter.priority !== 'all' && c.priority !== filter.priority) return false
-      if (filter.status !== 'all' && (c.status === 'in_progress' ? 'inprogress' : c.status) !== filter.status) return false
+      if (filter.status !== 'all') {
+        const normalizedStatus = c.status === 'in_progress' ? 'inprogress' : c.status
+        if (normalizedStatus !== filter.status) return false
+      }
       const q = filter.search.toLowerCase()
       if (q && !c.location?.toLowerCase().includes(q) && !c.problem_type?.toLowerCase().includes(q)) return false
       return true
@@ -124,16 +127,16 @@ export default function AdminPanel() {
             { label: 'Completed', value: stats.completed, icon: '✅', color: 'var(--priority-low)' },
             { label: 'Active Volunteers', value: volunteers.length, icon: '🙋', color: '#a855f7' },
           ].map(s => (
-            <div key={s.label} className="stat-card glass-card">
+            <div key={s.label} className="stat-card">
               <div className="stat-icon">{s.icon}</div>
-              <div className="stat-number" style={{ color: s.color, WebkitTextFillColor: s.color }}>{s.value}</div>
+              <div className="stat-number" style={{ color: s.color }}>{s.value}</div>
               <div className="stat-label">{s.label}</div>
             </div>
           ))}
         </div>
 
         {/* Volunteers section */}
-        <div className="admin-section glass-card" style={{ marginBottom: 24 }}>
+        <div className="admin-section" style={{ marginBottom: 24 }}>
           <h2 className="admin-section-title">🙋 Volunteer Roster</h2>
           <div className="vol-roster">
             {volunteers.map(v => (

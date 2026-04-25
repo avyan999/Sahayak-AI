@@ -6,22 +6,26 @@ import { db } from '../firebase'
 import './ReportIssue.css'
 
 const PROBLEM_TYPES = [
-  { value: 'food', label: '🍽️ Food Shortage', weight: 3 },
-  { value: 'medical', label: '🚑 Medical Emergency', weight: 4 },
+  { value: 'medical', label: '🚑 Medical Emergency', weight: 5 },
   { value: 'disaster', label: '🌊 Disaster Relief', weight: 5 },
-  { value: 'shelter', label: '🏠 Shelter Needed', weight: 3 },
+  { value: 'food', label: '🍽️ Food Shortage', weight: 4 },
+  { value: 'shelter', label: '🏠 Shelter Needed', weight: 4 },
   { value: 'water', label: '💧 Water Supply', weight: 3 },
-  { value: 'education', label: '📚 Education', weight: 1 },
+  { value: 'education', label: '📚 Education', weight: 2 },
   { value: 'other', label: '📌 Other', weight: 1 },
 ]
 
-const PROBLEM_WEIGHTS = { disaster: 5, medical: 4, food: 3, shelter: 3, water: 3, education: 1, other: 1 }
+const PROBLEM_WEIGHTS = { medical: 5, disaster: 5, food: 4, shelter: 4, water: 3, education: 2, other: 1 }
 
 function calcPriority(people, urgency, type) {
-  const score = (people * 2) + Number(urgency) + (PROBLEM_WEIGHTS[type] || 1)
-  if (score >= 15) return { score, level: 'high' }
-  if (score >= 8) return { score, level: 'medium' }
-  return { score, level: 'low' }
+  const peopleScore = Math.min(people / 20, 5)
+  const problemWeight = PROBLEM_WEIGHTS[type] || 1
+  const score = (peopleScore * 0.4) + (Number(urgency) * 0.4) + (problemWeight * 0.2)
+  const finalScore = Number(score.toFixed(2))
+
+  if (finalScore >= 4) return { score: finalScore, level: 'high', peopleScore, problemWeight }
+  if (finalScore >= 2.5) return { score: finalScore, level: 'medium', peopleScore, problemWeight }
+  return { score: finalScore, level: 'low', peopleScore, problemWeight }
 }
 
 export default function ReportIssue() {
@@ -41,6 +45,29 @@ export default function ReportIssue() {
     description: '',
     image_url: '',
   })
+
+  // Auto-detect problem type from description
+  useEffect(() => {
+    if (!form.description) return;
+    const text = form.description.toLowerCase();
+    let detectedType = null;
+
+    if (text.match(/\b(injury|hospital|doctor|blood|bleeding|sick|ill)\b/)) {
+      detectedType = 'medical';
+    } else if (text.match(/\b(flood|earthquake|fire|storm|cyclone|disaster)\b/)) {
+      detectedType = 'disaster';
+    } else if (text.match(/\b(hungry|food|starving|ration|eat)\b/)) {
+      detectedType = 'food';
+    } else if (text.match(/\b(shelter|house|tent|homeless|sleep)\b/)) {
+      detectedType = 'shelter';
+    } else if (text.match(/\b(water|thirsty|drink|clean water)\b/)) {
+      detectedType = 'water';
+    }
+
+    if (detectedType) {
+      setForm(f => ({ ...f, problem_type: detectedType }));
+    }
+  }, [form.description]);
 
   const preview = calcPriority(Number(form.people_affected) || 0, form.urgency, form.problem_type)
 
@@ -74,7 +101,7 @@ export default function ReportIssue() {
     const reader = new FileReader()
     reader.onload = (ev) => {
       setImagePreview(ev.target.result)
-      setForm(f => ({ ...f, image_url: ev.target.result.substring(0, 200) }))
+      setForm(f => ({ ...f, image_url: ev.target.result }))
     }
     reader.readAsDataURL(file)
   }
@@ -118,25 +145,20 @@ export default function ReportIssue() {
   return (
     <div className="page-wrapper">
       <div className="page-content" style={{ maxWidth: 900 }}>
-        <div className="page-header">
+        <div className="page-header" style={{ marginBottom: 24, borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
           <div>
-            <h1 className="page-title">📝 Report an Issue</h1>
-            <p className="page-subtitle">Document community needs for immediate action</p>
+            <h1 className="page-title" style={{ fontSize: '1.5rem' }}>Report an Issue</h1>
+            <p className="page-subtitle" style={{ fontSize: '0.9rem' }}>Document community needs for immediate action.</p>
           </div>
-          {/* Live priority preview */}
-          <div className={`priority-preview badge-${preview.level}`} style={{ padding: '12px 20px', borderRadius: 'var(--radius-lg)' }}>
-            <div className="preview-score-label">Live Priority</div>
-            <div className="preview-score-val">
-              {preview.level === 'high' ? '🔴' : preview.level === 'medium' ? '🟡' : '🟢'} {preview.level.toUpperCase()}
-            </div>
-            <div className="preview-score-num">Score: {preview.score}</div>
+          <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            <strong>Priority:</strong> <span style={{ color: `var(--priority-${preview.level})`, fontWeight: 600 }}>{preview.level.toUpperCase()}</span> (Score: {preview.score})
           </div>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="report-grid">
             {/* Location */}
-            <div className="report-card glass-card">
+            <div className="report-card">
               <h3 className="report-section-title">📍 Location</h3>
               <div className="form-group">
                 <label className="form-label">Location Name / Address</label>
@@ -168,7 +190,7 @@ export default function ReportIssue() {
             </div>
 
             {/* Problem Details */}
-            <div className="report-card glass-card">
+            <div className="report-card">
               <h3 className="report-section-title">⚠️ Problem Details</h3>
               <div className="form-group">
                 <label className="form-label">Problem Type</label>
@@ -217,7 +239,7 @@ export default function ReportIssue() {
             </div>
 
             {/* Description + Image */}
-            <div className="report-card glass-card">
+            <div className="report-card">
               <h3 className="report-section-title">📄 Additional Details</h3>
               <div className="form-group">
                 <label className="form-label">Description</label>
@@ -249,20 +271,20 @@ export default function ReportIssue() {
           </div>
 
           {/* Priority breakdown */}
-          <div className={`priority-breakdown glass-card badge-${preview.level}`}>
-            <div className="breakdown-title">📊 Priority Calculation</div>
+          <div className="priority-breakdown">
+            <div className="breakdown-title" style={{ fontWeight: 600, borderBottom: '1px solid var(--border)', paddingBottom: 8, marginBottom: 12 }}>Priority Calculation</div>
             <div className="breakdown-items">
               <div className="breakdown-item">
-                <span>People × 2</span>
-                <span className="breakdown-val">+{Number(form.people_affected || 0) * 2}</span>
+                <span>People (min(count/20, 5)) × 0.4</span>
+                <span className="breakdown-val">+{(preview.peopleScore * 0.4).toFixed(2)}</span>
               </div>
               <div className="breakdown-item">
-                <span>Urgency</span>
-                <span className="breakdown-val">+{form.urgency}</span>
+                <span>Urgency × 0.4</span>
+                <span className="breakdown-val">+{(form.urgency * 0.4).toFixed(2)}</span>
               </div>
               <div className="breakdown-item">
-                <span>Problem Weight ({form.problem_type})</span>
-                <span className="breakdown-val">+{PROBLEM_WEIGHTS[form.problem_type] || 1}</span>
+                <span>Problem Weight ({form.problem_type}) × 0.2</span>
+                <span className="breakdown-val">+{(preview.problemWeight * 0.2).toFixed(2)}</span>
               </div>
               <div className="breakdown-divider" />
               <div className="breakdown-item total">

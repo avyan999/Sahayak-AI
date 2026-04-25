@@ -87,9 +87,9 @@ export default function VolunteerPanel() {
             { label: 'Active Tasks', value: stats.active, icon: '⚡', color: 'var(--accent-secondary)' },
             { label: 'Completed', value: stats.completed, icon: '✅', color: 'var(--priority-low)' },
           ].map(s => (
-            <div key={s.label} className="stat-card glass-card">
+            <div key={s.label} className="stat-card">
               <div className="stat-icon">{s.icon}</div>
-              <div className="stat-number" style={{ color: s.color, WebkitTextFillColor: s.color }}>{s.value}</div>
+              <div className="stat-number" style={{ color: s.color }}>{s.value}</div>
               <div className="stat-label">{s.label}</div>
             </div>
           ))}
@@ -109,83 +109,79 @@ export default function VolunteerPanel() {
         </div>
 
         {filtered.length === 0 ? (
-          <div className="empty-state glass-card">
+          <div className="empty-state">
             <div className="empty-icon">🎉</div>
             <h3>{filter === 'all' ? 'No tasks assigned yet' : `No ${filter} tasks`}</h3>
             <p className="text-muted">Check back when an admin assigns cases to you.</p>
           </div>
         ) : (
-          <div className="vol-tasks-grid stagger">
-            {filtered.map(a => (
-              <div key={a.id} className={`task-card glass-card task-${getStatus(a)}`}>
-                <div className="task-card-top">
-                  <div className="task-icon">{PROBLEM_ICONS[a.problem_type] || '📌'}</div>
-                  <div className="flex gap-8">
-                    <span className={`badge badge-${a.priority}`}>{a.priority}</span>
-                    <span className={`badge ${
-                      getStatus(a) === 'completed' ? 'badge-completed' :
-                      getStatus(a) === 'accepted' ? 'badge-inprogress' :
-                      getStatus(a) === 'rejected' ? 'badge-high' : 'badge-pending'
-                    }`}>
-                      {getStatus(a) === 'accepted' ? 'active' : getStatus(a)}
-                    </span>
-                  </div>
-                </div>
-
-                <h3 className="task-title">
-                  {a.problem_type?.charAt(0).toUpperCase() + a.problem_type?.slice(1)} Issue
-                </h3>
-                <p className="task-desc">{a.description || 'No description.'}</p>
-
-                <div className="task-meta">
-                  <span>📍 {a.location}</span>
-                  <span>👥 {a.people_affected} people</span>
-                  <span>⚡ {a.urgency}/5 urgency</span>
-                </div>
-
-                <div className="task-assigned-date">
-                  Assigned: {a.createdAt ? new Date(a.createdAt.toMillis()).toLocaleDateString() : ''}
-                </div>
-
-                {/* Action buttons */}
-                {getStatus(a) === 'pending' && (
-                  <div className="task-actions">
-                    <button
-                      className="btn btn-success btn-sm"
-                      onClick={() => handleAction(a.id, 'accept')}
-                      disabled={!!actionLoading[a.id]}
-                    >
-                      {actionLoading[a.id] === 'accept' ? <span className="spinner" /> : '✅ Accept'}
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => handleAction(a.id, 'reject')}
-                      disabled={!!actionLoading[a.id]}
-                    >
-                      {actionLoading[a.id] === 'reject' ? <span className="spinner" /> : '❌ Reject'}
-                    </button>
-                  </div>
-                )}
-
-                {getStatus(a) === 'accepted' && (
-                  <div className="task-actions">
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => handleAction(a.id, 'complete')}
-                      disabled={!!actionLoading[a.id]}
-                    >
-                      {actionLoading[a.id] === 'complete' ? <span className="spinner" /> : '🏁 Mark Complete'}
-                    </button>
-                  </div>
-                )}
-
-                {getStatus(a) === 'completed' && (
-                  <div className="task-completed-banner">
-                    🎉 Task completed! Great work.
-                  </div>
-                )}
-              </div>
-            ))}
+          <div className="table-wrapper stagger">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Problem</th>
+                  <th>Location</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(a => (
+                  <tr key={a.id}>
+                    <td>
+                      <div className="flex items-center gap-8">
+                        <span>{PROBLEM_ICONS[a.problem_type] || '📌'}</span>
+                        <span style={{ fontWeight: 500 }}>{a.problem_type?.charAt(0).toUpperCase() + a.problem_type?.slice(1)}</span>
+                      </div>
+                    </td>
+                    <td>{a.location}</td>
+                    <td><span className={`badge badge-${a.priority}`}>{a.priority}</span></td>
+                    <td>
+                      <span className={`badge ${
+                        getStatus(a) === 'completed' ? 'badge-completed' :
+                        getStatus(a) === 'accepted' ? 'badge-inprogress' :
+                        getStatus(a) === 'rejected' ? 'badge-high' : 'badge-pending'
+                      }`}>
+                        {getStatus(a) === 'accepted' ? 'active' : getStatus(a)}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex gap-8">
+                        {getStatus(a) === 'pending' && (
+                          <>
+                            <button
+                              className="btn btn-success btn-sm"
+                              onClick={() => handleAction(a.id, 'accept')}
+                              disabled={!!actionLoading[a.id]}
+                            >
+                              {actionLoading[a.id] === 'accept' ? <span className="spinner" /> : '✅ Accept'}
+                            </button>
+                            <button
+                              className="btn btn-danger btn-sm"
+                              onClick={() => handleAction(a.id, 'reject')}
+                              disabled={!!actionLoading[a.id]}
+                            >
+                              {actionLoading[a.id] === 'reject' ? <span className="spinner" /> : '❌ Reject'}
+                            </button>
+                          </>
+                        )}
+                        {getStatus(a) === 'accepted' && (
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={() => handleAction(a.id, 'complete')}
+                            disabled={!!actionLoading[a.id]}
+                          >
+                            {actionLoading[a.id] === 'complete' ? <span className="spinner" /> : '🏁 Complete'}
+                          </button>
+                        )}
+                        {getStatus(a) === 'completed' && <span className="text-xs" style={{ color: 'var(--priority-low)' }}>🎉 Done</span>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

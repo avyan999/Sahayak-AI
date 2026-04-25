@@ -3,48 +3,6 @@
   overflow-x: hidden;
 }
 
-/* ── Orbs ── */
-.hero-bg-orbs, .login-bg-orbs {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.3;
-  animation: float 8s ease-in-out infinite;
-}
-
-.orb-1 {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, #0ea5e9, transparent);
-  top: -100px;
-  right: -100px;
-  animation-delay: 0s;
-}
-
-.orb-2 {
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, #10b981, transparent);
-  bottom: 100px;
-  left: -100px;
-  animation-delay: 2s;
-}
-
-.orb-3 {
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, #6366f1, transparent);
-  top: 50%;
-  left: 40%;
-  animation-delay: 4s;
-}
 
 /* ── Hero ── */
 .hero-section {
@@ -60,9 +18,11 @@
 
 .hero-content {
   flex: 1;
-  max-width: 580px;
+  max-width: 800px;
   position: relative;
   z-index: 1;
+  text-align: center;
+  margin: 0 auto;
 }
 
 .hero-badge {
@@ -100,6 +60,7 @@
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .hero-problem-strip {
@@ -108,6 +69,7 @@
   gap: 12px;
   margin-top: 36px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .problem-tag {
@@ -130,108 +92,6 @@
   font-size: 1rem;
 }
 
-/* Dashboard preview */
-.hero-visual {
-  flex: 1;
-  max-width: 500px;
-  position: relative;
-  z-index: 1;
-}
-
-.dashboard-preview {
-  background: rgba(10, 22, 40, 0.8);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  padding: 20px;
-  backdrop-filter: blur(16px);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 40px rgba(14, 165, 233, 0.1);
-}
-
-.preview-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 16px;
-}
-
-.preview-dots {
-  display: flex;
-  gap: 6px;
-}
-.preview-dots span {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.preview-title {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.preview-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.preview-stat {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  text-align: center;
-}
-
-.p-num {
-  display: block;
-  font-size: 1.5rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.p-lbl {
-  display: block;
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  margin-top: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.preview-cases {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.preview-case-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  background: rgba(255,255,255,0.02);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  gap: 8px;
-}
-
-.preview-case-type {
-  font-size: 0.78rem;
-  font-weight: 500;
-  flex: 1;
-}
-
-.preview-case-loc {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  flex: 1;
-  text-align: center;
-}
 
 /* ── Sections ── */
 .stats-section,
@@ -281,11 +141,8 @@
 .landing-stat-icon { font-size: 2rem; margin-bottom: 12px; }
 .landing-stat-number {
   font-size: 3rem;
-  font-weight: 800;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-weight: 400;
+  color: var(--accent-primary);
   line-height: 1;
 }
 .landing-stat-label {
@@ -396,12 +253,13 @@
 .logic-card {
   display: flex;
   align-items: center;
-  gap: 60px;
+  justify-content: center;
   padding: 48px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
 }
 
 .logic-content { flex: 1; }
-.logic-visual { flex: 0 0 280px; }
 
 .formula-box {
   background: rgba(14, 165, 233, 0.08);
@@ -470,9 +328,9 @@
 
 /* CTA */
 .cta-card {
-  background: var(--accent-gradient-soft);
-  border: 1px solid var(--border-accent);
-  border-radius: var(--radius-xl);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   padding: 64px;
   text-align: center;
 }

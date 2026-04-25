@@ -54,7 +54,7 @@ export default function Navbar() {
         {/* Logo */}
         <Link to={user ? '/dashboard' : '/'} className="navbar-logo">
           <span className="logo-icon">🤝</span>
-          <span className="logo-text">Sahayak <span className="text-gradient">AI</span></span>
+          <span className="logo-text">Sahayak <span style={{ color: 'var(--accent-primary)' }}>AI</span></span>
         </Link>
 
         {/* Desktop Links */}

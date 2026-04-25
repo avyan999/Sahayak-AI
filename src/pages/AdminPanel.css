@@ -1,5 +1,7 @@
 .admin-section {
   padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
 }
 
 .admin-section-title {
@@ -21,7 +23,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  background: rgba(255,255,255,0.03);
+  background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
   transition: var(--transition);

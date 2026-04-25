@@ -91,7 +91,7 @@ function useCountUp(target, duration = 2000, start = false) {
 function StatCard({ stat, animate }) {
   const count = useCountUp(stat.value, 1800, animate)
   return (
-    <div className="landing-stat-card glass-card">
+    <div className="landing-stat-card">
       <div className="landing-stat-icon">{stat.icon}</div>
       <div className="landing-stat-number">
         {animate ? count.toLocaleString() : 0}{stat.suffix}
@@ -118,16 +118,11 @@ export default function Landing() {
     <div className="landing-page">
       {/* Hero */}
       <section className="hero-section">
-        <div className="hero-bg-orbs">
-          <div className="orb orb-1" />
-          <div className="orb orb-2" />
-          <div className="orb orb-3" />
-        </div>
         <div className="hero-content animate-fade-in-up">
           <div className="hero-badge">🚀 Built for Social Impact</div>
           <h1 className="hero-title">
             Coordinating Aid<br />
-            <span className="text-gradient">Intelligently & Instantly</span>
+            <span style={{ color: 'var(--accent-primary)' }}>Intelligently & Instantly</span>
           </h1>
           <p className="hero-subtitle">
             Sahayak AI centralizes scattered community data, auto-prioritizes urgent needs,
@@ -148,48 +143,6 @@ export default function Landing() {
             <span className="problem-tag">❌ WhatsApp Groups</span>
             <span className="arrow">→</span>
             <span className="problem-tag solved">✅ Sahayak AI</span>
-          </div>
-        </div>
-
-        {/* Hero visual */}
-        <div className="hero-visual animate-float">
-          <div className="dashboard-preview">
-            <div className="preview-header">
-              <div className="preview-dots">
-                <span style={{background:'#ef4444'}} />
-                <span style={{background:'#f59e0b'}} />
-                <span style={{background:'#22c55e'}} />
-              </div>
-              <span className="preview-title">Sahayak AI Dashboard</span>
-            </div>
-            <div className="preview-stats">
-              <div className="preview-stat">
-                <span className="p-num" style={{color:'#ef4444'}}>12</span>
-                <span className="p-lbl">High Priority</span>
-              </div>
-              <div className="preview-stat">
-                <span className="p-num" style={{color:'#f59e0b'}}>28</span>
-                <span className="p-lbl">In Progress</span>
-              </div>
-              <div className="preview-stat">
-                <span className="p-num" style={{color:'#22c55e'}}>94</span>
-                <span className="p-lbl">Resolved</span>
-              </div>
-            </div>
-            <div className="preview-cases">
-              {[
-                { type:'🚑 Medical Emergency', loc:'Dharavi, Mumbai', priority:'high' },
-                { type:'🍽️ Food Shortage', loc:'Kurla East', priority:'medium' },
-                { type:'🌊 Flood Relief', loc:'Andheri West', priority:'high' },
-                { type:'🏠 Shelter Needed', loc:'Bandra Slums', priority:'low' },
-              ].map((c, i) => (
-                <div key={i} className="preview-case-row">
-                  <span className="preview-case-type">{c.type}</span>
-                  <span className="preview-case-loc">{c.loc}</span>
-                  <span className={`badge badge-${c.priority}`}>{c.priority}</span>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </section>
@@ -215,7 +168,7 @@ export default function Landing() {
           </p>
           <div className="features-grid stagger">
             {FEATURES.map(f => (
-              <div key={f.title} className="feature-card glass-card">
+              <div key={f.title} className="feature-card">
                 <div className="feature-icon-wrap" style={{ background: f.color + '22', color: f.color }}>
                   {f.icon}
                 </div>
@@ -234,7 +187,7 @@ export default function Landing() {
           <h2 className="section-title">Built for every stakeholder</h2>
           <div className="roles-grid stagger">
             {ROLES.map(r => (
-              <div key={r.role} className="role-card glass-card">
+              <div key={r.role} className="role-card">
                 <div className="role-icon" style={{ background: r.color + '22', color: r.color }}>
                   {r.icon}
                 </div>
@@ -254,40 +207,28 @@ export default function Landing() {
       {/* Priority Logic */}
       <section className="logic-section">
         <div className="container">
-          <div className="logic-card glass-card">
-            <div className="logic-content">
+          <div className="logic-card">
+            <div className="logic-content" style={{ maxWidth: 800, margin: '0 auto', textAlign: 'center' }}>
               <div className="section-label">⚡ PRIORITY ENGINE</div>
               <h2 className="section-title">Smart scoring, not guesswork</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>
                 Every submitted case is instantly scored using a transparent rule-based formula:
               </p>
               <div className="formula-box">
-                <code>priority_score = (people × 2) + urgency + problem_weight</code>
+                <code>priority_score = (people_score × 0.4) + (urgency × 0.4) + (problem_weight × 0.2)</code>
               </div>
-              <div className="priority-levels">
+              <div className="priority-levels" style={{ display: 'flex', justifyContent: 'center', gap: 32, flexWrap: 'wrap', marginTop: 24 }}>
                 <div className="p-level">
-                  <span className="badge badge-high">🔴 High</span>
-                  <span className="text-sm text-secondary">Score ≥ 15</span>
+                  <span className="badge badge-high" style={{ marginBottom: 8, display: 'inline-block' }}>🔴 High</span>
+                  <div className="text-sm text-secondary">Score ≥ 4.0</div>
                 </div>
                 <div className="p-level">
-                  <span className="badge badge-medium">🟡 Medium</span>
-                  <span className="text-sm text-secondary">Score 8–14</span>
+                  <span className="badge badge-medium" style={{ marginBottom: 8, display: 'inline-block' }}>🟡 Medium</span>
+                  <div className="text-sm text-secondary">Score 2.5–3.9</div>
                 </div>
                 <div className="p-level">
-                  <span className="badge badge-low">🟢 Low</span>
-                  <span className="text-sm text-secondary">Score &lt; 8</span>
-                </div>
-              </div>
-            </div>
-            <div className="logic-visual">
-              <div className="score-demo">
-                <div className="score-row"><span>50 people</span><span className="score-val">+100</span></div>
-                <div className="score-row"><span>Urgency: 4/5</span><span className="score-val">+4</span></div>
-                <div className="score-row"><span>Type: Medical</span><span className="score-val">+4</span></div>
-                <div className="score-divider" />
-                <div className="score-row total"><span>Priority Score</span><span className="score-total">108</span></div>
-                <div style={{ marginTop: 12 }}>
-                  <span className="badge badge-high" style={{ fontSize: '0.9rem', padding: '6px 16px' }}>🔴 HIGH PRIORITY</span>
+                  <span className="badge badge-low" style={{ marginBottom: 8, display: 'inline-block' }}>🟢 Low</span>
+                  <div className="text-sm text-secondary">Score &lt; 2.5</div>
                 </div>
               </div>
             </div>
@@ -319,7 +260,7 @@ export default function Landing() {
           <div className="footer-inner">
             <div className="navbar-logo">
               <span className="logo-icon">🤝</span>
-              <span className="logo-text">Sahayak <span className="text-gradient">AI</span></span>
+              <span className="logo-text">Sahayak <span style={{ color: 'var(--accent-primary)' }}>AI</span></span>
             </div>
             <p className="footer-tagline">Smart Resource Allocation for NGOs</p>
             <p className="footer-copy">© 2024 Sahayak AI. Built with ❤️ for social impact.</p>

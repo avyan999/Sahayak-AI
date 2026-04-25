@@ -26,6 +26,23 @@ export default function Dashboard() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const casesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
       
+      // Detect new cases
+      if (!loading) {
+        snapshot.docChanges().forEach(change => {
+          if (change.type === 'added') {
+            const id = change.doc.id
+            setNewCaseIds(prev => new Set([...prev, id]))
+            setTimeout(() => {
+              setNewCaseIds(prev => {
+                const next = new Set(prev)
+                next.delete(id)
+                return next
+              })
+            }, 8000)
+          }
+        })
+      }
+
       // Calculate stats
       const newStats = { total: casesData.length, pending: 0, inprogress: 0, completed: 0 }
       casesData.forEach(c => {
@@ -48,7 +65,10 @@ export default function Dashboard() {
   const filtered = cases
     .filter(c => {
       if (filter.priority !== 'all' && c.priority !== filter.priority) return false
-      if (filter.status !== 'all' && (c.status === 'in_progress' ? 'inprogress' : c.status) !== filter.status) return false
+      if (filter.status !== 'all') {
+        const normalizedStatus = c.status === 'in_progress' ? 'inprogress' : c.status
+        if (normalizedStatus !== filter.status) return false
+      }
       if (filter.search && !c.location?.toLowerCase().includes(filter.search.toLowerCase()) &&
           !c.problem_type?.toLowerCase().includes(filter.search.toLowerCase()) &&
           !c.description?.toLowerCase().includes(filter.search.toLowerCase())) return false
@@ -90,9 +110,9 @@ export default function Dashboard() {
 
         <div className="stats-grid stagger" style={{ marginBottom: 32 }}>
           {STAT_CARDS.map(s => (
-            <div key={s.label} className="stat-card glass-card">
+            <div key={s.label} className="stat-card">
               <div className="stat-icon">{s.icon}</div>
-              <div className="stat-number" style={{ color: s.color, WebkitTextFillColor: s.color }}>{s.value}</div>
+              <div className="stat-number" style={{ color: s.color }}>{s.value}</div>
               <div className="stat-label">{s.label}</div>
             </div>
           ))}
@@ -129,42 +149,49 @@ export default function Dashboard() {
         </div>
 
         {filtered.length === 0 ? (
-          <div className="empty-state glass-card">
+          <div className="empty-state">
             <div className="empty-icon">📭</div>
             <h3>No cases found</h3>
             <p className="text-muted">Try adjusting your filters or report a new issue.</p>
           </div>
         ) : (
-          <div className="cases-grid stagger">
-            {filtered.map(c => (
-              <div
-                key={c.id}
-                className={`case-card glass-card ${newCaseIds.has(c.id) ? 'case-new' : ''}`}
-                onClick={() => setSelectedCase(c)}
-              >
-                {newCaseIds.has(c.id) && <div className="new-badge">🔔 NEW</div>}
-                <div className="case-card-header">
-                  <div className="case-icon">{PROBLEM_ICONS[c.problem_type] || '📌'}</div>
-                  <div className="flex gap-8">
-                    <span className={`badge badge-${c.priority}`}>{c.priority}</span>
-                    <span className={`badge badge-${c.status === 'in_progress' ? 'inprogress' : c.status}`}>
-                      {c.status === 'in_progress' ? 'In Progress' : c.status}
-                    </span>
-                  </div>
-                </div>
-                <h3 className="case-title">{c.problem_type?.charAt(0).toUpperCase() + c.problem_type?.slice(1)} Issue</h3>
-                <p className="case-desc">{c.description || 'No description provided.'}</p>
-                <div className="case-meta">
-                  <span className="case-meta-item">📍 {c.location}</span>
-                  <span className="case-meta-item">👥 {c.people_affected} affected</span>
-                  <span className="case-meta-item">⚡ Urgency: {c.urgency}/5</span>
-                </div>
-                <div className="case-footer">
-                  <span className="case-score">Score: {c.priorityScore}</span>
-                  <span className="case-date">{c.createdAt ? new Date(c.createdAt.toMillis()).toLocaleDateString() : ''}</span>
-                </div>
-              </div>
-            ))}
+          <div className="table-wrapper stagger">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Problem</th>
+                  <th>Location</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(c => (
+                  <tr
+                    key={c.id}
+                    onClick={() => setSelectedCase(c)}
+                    style={{ cursor: 'pointer', backgroundColor: newCaseIds.has(c.id) ? 'rgba(26, 115, 232, 0.05)' : '' }}
+                  >
+                    <td>
+                      <div className="flex items-center gap-8">
+                        <span>{PROBLEM_ICONS[c.problem_type] || '📌'}</span>
+                        <span style={{ fontWeight: 500 }}>{c.problem_type?.charAt(0).toUpperCase() + c.problem_type?.slice(1)}</span>
+                        {newCaseIds.has(c.id) && <span className="badge" style={{ background: '#1a73e8', color: 'white', padding: '2px 6px', fontSize: '0.65rem', border: 'none' }}>NEW</span>}
+                      </div>
+                    </td>
+                    <td>{c.location}</td>
+                    <td>
+                      <span className={`badge badge-${c.priority}`}>{c.priority}</span>
+                    </td>
+                    <td>
+                      <span className={`badge badge-${c.status === 'in_progress' ? 'inprogress' : c.status}`}>
+                        {c.status === 'in_progress' ? 'In Progress' : c.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 

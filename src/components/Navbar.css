@@ -5,9 +5,7 @@
   right: 0;
   z-index: 100;
   height: var(--navbar-height);
-  background: rgba(5, 13, 26, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: #ffffff;
   border-bottom: 1px solid var(--border);
 }
 
@@ -63,7 +61,7 @@
 
 .nav-link:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-secondary);
 }
 
 .nav-link.active {
@@ -100,8 +98,6 @@
 
 .ws-dot.connected {
   background: var(--priority-low);
-  box-shadow: 0 0 6px var(--priority-low);
-  animation: pulse-glow 2s infinite;
 }
 
 .ws-dot.disconnected {
@@ -184,7 +180,7 @@
   padding: 12px 16px 16px;
   gap: 4px;
   border-top: 1px solid var(--border);
-  background: rgba(5, 13, 26, 0.95);
+  background: #ffffff;
 }
 
 .mobile-nav-link {

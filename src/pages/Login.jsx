@@ -70,21 +70,17 @@ export default function Login() {
 
   return (
     <div className="login-page">
-      <div className="login-bg-orbs">
-        <div className="orb orb-1" />
-        <div className="orb orb-2" />
-      </div>
 
       <div className="login-container animate-fade-in-up">
         {/* Left side */}
         <div className="login-left">
           <Link to="/" className="navbar-logo" style={{ marginBottom: 32 }}>
             <span className="logo-icon">🤝</span>
-            <span className="logo-text">Sahayak <span className="text-gradient">AI</span></span>
+            <span className="logo-text">Sahayak <span style={{ color: 'var(--accent-primary)' }}>AI</span></span>
           </Link>
           <h1 className="login-headline">
             Coordinate Aid.<br />
-            <span className="text-gradient">Save Lives.</span>
+            <span style={{ color: 'var(--accent-primary)' }}>Save Lives.</span>
           </h1>
           <p className="login-tagline">
             The smart resource allocation platform for NGOs and social impact organizations.
@@ -112,7 +108,7 @@ export default function Login() {
 
         {/* Right side - Form */}
         <div className="login-right">
-          <div className="login-form-card glass-card">
+          <div className="login-form-card">
             {/* Toggle tabs */}
             <div className="form-tabs">
               <button
