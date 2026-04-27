@@ -115,6 +115,7 @@ export default function ReportIssue() {
         priorityScore: preview.score,
         priority: preview.level,
         status: 'pending',
+        source: 'web',
         createdBy: user?.uid || 'anonymous',
         createdAt: serverTimestamp(),
       }

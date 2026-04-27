@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet'
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore'
+import { ref, onValue } from 'firebase/database'
 import { db } from '../firebase'
+import { formDb } from '../formFirebase'
+import { DUMMY_REALTIME_CASES } from '../utils/dummyData'
 import 'leaflet/dist/leaflet.css'
 import './MapView.css'
 
@@ -38,26 +41,52 @@ function MapUpdater({ center }) {
 
 export default function MapView() {
   const [cases, setCases] = useState([])
+  const [realtimeCases, setRealtimeCases] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [selectedCase, setSelectedCase] = useState(null)
   const [mapCenter, setMapCenter] = useState([20.593, 78.962]) // India center
 
   useEffect(() => {
+    // 1. Firestore Cases
     const q = query(collection(db, 'cases'), orderBy('createdAt', 'desc'))
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const casesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      setCases(casesData)
+    const unsubFirestore = onSnapshot(q, (snap) => {
+      const data = snap.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        source: doc.data().source || 'web'
+      }))
+      setCases(data)
+    })
+
+    // 2. Realtime Database Cases
+    const issueRef = ref(formDb, 'issue')
+    const unsubRealtime = onValue(issueRef, (snapshot) => {
+      const data = snapshot.val()
+      const list = data ? Object.entries(data).map(([id, val]) => ({
+        id,
+        ...val,
+        source: (val.source || 'form').toLowerCase(),
+        priority: (val.priority || 'medium').toLowerCase(),
+        status: (val.status || 'pending').toLowerCase()
+      })) : [];
+      setRealtimeCases([...list, ...DUMMY_REALTIME_CASES])
       setLoading(false)
     }, (err) => {
-      console.error(err)
+      console.error("Map RTDB Error:", err);
+      setRealtimeCases(DUMMY_REALTIME_CASES)
       setLoading(false)
     })
 
-    return () => unsubscribe()
+    return () => {
+      unsubFirestore()
+      unsubRealtime()
+    }
   }, [])
 
-  const filtered = filter === 'all' ? cases : cases.filter(c => c.priority === filter)
+  const allCases = [...cases, ...realtimeCases]
+
+  const filtered = filter === 'all' ? allCases : allCases.filter(c => (c.priority || '').toLowerCase() === filter)
 
   // Assign fallback coordinates to cases without lat/lng
   const casesWithCoords = filtered.map((c, i) => ({
@@ -67,10 +96,10 @@ export default function MapView() {
   }))
 
   const stats = {
-    total: cases.length,
-    high: cases.filter(c => c.priority === 'high').length,
-    medium: cases.filter(c => c.priority === 'medium').length,
-    low: cases.filter(c => c.priority === 'low').length,
+    total: allCases.length,
+    high: allCases.filter(c => (c.priority || '').toLowerCase() === 'high').length,
+    medium: allCases.filter(c => (c.priority || '').toLowerCase() === 'medium').length,
+    low: allCases.filter(c => (c.priority || '').toLowerCase() === 'low').length,
   }
 
   return (
@@ -123,7 +152,11 @@ export default function MapView() {
                   <span className={`badge badge-${c.priority}`}>{c.priority}</span>
                 </div>
                 <div className="mci-loc">📍 {c.location}</div>
-                <div className="mci-meta">👥 {c.people_affected} · ⚡ {c.urgency}/5</div>
+                <div className="mci-meta">
+                  <span>👥 {c.people_affected || 0}</span> · 
+                  <span>⚡ {c.urgency || 3}/5</span> · 
+                  <span className="source-label">{c.source === 'whatsapp' ? '💬' : c.source === 'form' ? '📝' : '🌐'}</span>
+                </div>
               </div>
             ))
           )}
@@ -153,10 +186,10 @@ export default function MapView() {
               <CircleMarker
                 key={c.id}
                 center={[c._lat, c._lng]}
-                radius={Math.max(8, Math.min(30, c.people_affected / 5))}
+                radius={Math.max(8, Math.min(30, (c.people_affected || 1) / 5))}
                 pathOptions={{
-                  color: PRIORITY_COLORS[c.priority],
-                  fillColor: PRIORITY_COLORS[c.priority],
+                  color: PRIORITY_COLORS[(c.priority || 'medium').toLowerCase()] || PRIORITY_COLORS.medium,
+                  fillColor: PRIORITY_COLORS[(c.priority || 'medium').toLowerCase()] || PRIORITY_COLORS.medium,
                   fillOpacity: 0.7,
                   weight: 2,
                 }}
@@ -170,18 +203,19 @@ export default function MapView() {
                 <Popup className="custom-popup">
                   <div className="popup-content">
                     <div className="popup-header">
-                      <span>{PROBLEM_ICONS[c.problem_type]}</span>
+                      <span>{PROBLEM_ICONS[c.problem_type] || '📌'}</span>
                       <strong>{c.problem_type?.charAt(0).toUpperCase() + c.problem_type?.slice(1)}</strong>
-                      <span className={`badge badge-${c.priority}`}>{c.priority}</span>
+                      <span className={`badge badge-${(c.priority || 'medium').toLowerCase()}`}>{c.priority}</span>
                     </div>
                     <div className="popup-row">📍 {c.location}</div>
-                    <div className="popup-row">👥 {c.people_affected} people affected</div>
-                    <div className="popup-row">⚡ Urgency: {c.urgency}/5</div>
-                    <div className="popup-row">📊 Score: {c.priorityScore}</div>
+                    <div className="popup-row">👥 {c.people_affected || 0} people affected</div>
+                    <div className="popup-row">⚡ Urgency: {c.urgency || 3}/5</div>
+                    <div className="popup-row">📊 Score: {c.priorityScore || 0}</div>
+                    <div className="popup-row">🌐 Source: {c.source === 'whatsapp' ? 'WhatsApp Bot' : c.source === 'form' ? 'Google Form' : 'Web Platform'}</div>
                     {c.description && <div className="popup-desc">{c.description}</div>}
-                    <div className={`popup-status badge-${c.status === 'in_progress' ? 'inprogress' : c.status}`}
+                    <div className={`popup-status badge-${(c.status || 'pending').toLowerCase() === 'in_progress' ? 'inprogress' : (c.status || 'pending').toLowerCase()}`}
                       style={{ marginTop: 8, padding: '4px 10px', borderRadius: 'var(--radius-full)', display: 'inline-block', fontSize: '0.75rem', fontWeight: 600 }}>
-                      {c.status === 'in_progress' ? '⚡ In Progress' : c.status === 'completed' ? '✅ Completed' : '⏳ Pending'}
+                      {(c.status || 'pending').toLowerCase() === 'in_progress' ? '⚡ In Progress' : (c.status || 'pending').toLowerCase() === 'completed' ? '✅ Completed' : '⏳ Pending'}
                     </div>
                   </div>
                 </Popup>

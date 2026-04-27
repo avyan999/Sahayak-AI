@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { collection, query, onSnapshot, orderBy, doc, updateDoc, where } from 'firebase/firestore'
+import { ref, onValue, update } from 'firebase/database'
 import { db } from '../firebase'
+import { formDb } from '../formFirebase'
+import { DUMMY_REALTIME_CASES } from '../utils/dummyData'
 import './AdminPanel.css'
+import './Dashboard.css' // Reuse tab styles
 
 const PROBLEM_ICONS = {
   food: '🍽️', medical: '🚑', disaster: '🌊', shelter: '🏠',
@@ -12,6 +16,7 @@ const PROBLEM_ICONS = {
 export default function AdminPanel() {
   const { user } = useAuth()
   const [cases, setCases] = useState([])
+  const [realtimeCases, setRealtimeCases] = useState([])
   const [volunteers, setVolunteers] = useState([])
   const [stats, setStats] = useState({ total: 0, pending: 0, inprogress: 0, completed: 0 })
   const [loading, setLoading] = useState(true)
@@ -20,20 +25,37 @@ export default function AdminPanel() {
   const [selectedVol, setSelectedVol] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
   const [sort, setSort] = useState({ col: 'priority', dir: 'asc' })
+  const [activeTab, setActiveTab] = useState('web')
 
   useEffect(() => {
+    // 1. Firestore Cases
     const qCases = query(collection(db, 'cases'), orderBy('createdAt', 'desc'))
     const unsubCases = onSnapshot(qCases, (snapshot) => {
-      const casesData = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+      const casesData = snapshot.docs.map(d => ({ 
+        id: d.id, 
+        ...d.data(),
+        source: d.data().source || 'web',
+        _dbInstance: 'firestore'
+      }))
       setCases(casesData)
-      
-      const newStats = { total: casesData.length, pending: 0, inprogress: 0, completed: 0 }
-      casesData.forEach(c => {
-        if (c.status === 'pending') newStats.pending++
-        if (c.status === 'in_progress') newStats.inprogress++
-        if (c.status === 'completed') newStats.completed++
-      })
-      setStats(newStats)
+    })
+
+    // 2. Realtime Database Cases
+    const issueRef = ref(formDb, 'issue')
+    const unsubRealtime = onValue(issueRef, (snapshot) => {
+      const data = snapshot.val()
+      const list = data ? Object.entries(data).map(([id, val]) => ({
+        id,
+        ...val,
+        _dbInstance: 'form',
+        source: (val.source || 'form').toLowerCase(),
+        status: (val.status || 'pending').toLowerCase(),
+        priority: (val.priority || 'medium').toLowerCase()
+      })) : [];
+      setRealtimeCases([...list, ...DUMMY_REALTIME_CASES])
+    }, (err) => {
+      console.error("Admin RTDB Error:", err);
+      setRealtimeCases(DUMMY_REALTIME_CASES)
     })
 
     const qVols = query(collection(db, 'users'), where('role', '==', 'volunteer'))
@@ -42,18 +64,38 @@ export default function AdminPanel() {
       setLoading(false)
     })
 
-    return () => { unsubCases(); unsubVols(); }
+    return () => { 
+      unsubCases(); 
+      unsubRealtime();
+      unsubVols(); 
+    }
   }, [])
+
+  useEffect(() => {
+    const allCases = [...cases, ...realtimeCases]
+    const newStats = { total: allCases.length, pending: 0, inprogress: 0, completed: 0 }
+    allCases.forEach(c => {
+      const status = (c.status || '').toLowerCase()
+      const normalizedStatus = status === 'in_progress' ? 'inprogress' : status
+      if (normalizedStatus === 'pending') newStats.pending++
+      if (normalizedStatus === 'inprogress') newStats.inprogress++
+      if (normalizedStatus === 'completed') newStats.completed++
+    })
+    setStats(newStats)
+  }, [cases, realtimeCases])
 
   const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
 
-  const filtered = cases
+  const allCases = [...cases, ...realtimeCases]
+
+  const filtered = allCases
     .filter(c => {
-      if (filter.priority !== 'all' && c.priority !== filter.priority) return false
-      if (filter.status !== 'all') {
-        const normalizedStatus = c.status === 'in_progress' ? 'inprogress' : c.status
-        if (normalizedStatus !== filter.status) return false
-      }
+      const cPriority = (c.priority || '').toLowerCase()
+      const cStatus = (c.status || '').toLowerCase()
+      const normalizedStatus = cStatus === 'in_progress' ? 'inprogress' : cStatus
+
+      if (filter.priority !== 'all' && cPriority !== filter.priority) return false
+      if (filter.status !== 'all' && normalizedStatus !== filter.status) return false
       const q = filter.search.toLowerCase()
       if (q && !c.location?.toLowerCase().includes(q) && !c.problem_type?.toLowerCase().includes(q)) return false
       return true
@@ -64,7 +106,7 @@ export default function AdminPanel() {
         return sort.dir === 'asc' ? diff : -diff
       }
       if (sort.col === 'people') {
-        const diff = a.people_affected - b.people_affected
+        const diff = (a.people_affected || 0) - (b.people_affected || 0)
         return sort.dir === 'asc' ? diff : -diff
       }
       if (sort.col === 'score') {
@@ -72,6 +114,10 @@ export default function AdminPanel() {
       }
       return 0
     })
+
+  const webCases = filtered.filter(c => (c.source || 'web') === 'web')
+  const formCases = filtered.filter(c => c.source === 'form')
+  const whatsappCases = filtered.filter(c => c.source === 'whatsapp')
 
   const handleSort = (col) => {
     setSort(s => s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' })
@@ -82,11 +128,18 @@ export default function AdminPanel() {
     setActionLoading(true)
     try {
       const vol = volunteers.find(v => v.id === selectedVol)
-      await updateDoc(doc(db, 'cases', assignModal.id), {
+      const data = {
         status: 'in_progress',
         assignedTo: selectedVol,
         assignedVolunteerName: vol?.name || 'Unknown'
-      })
+      }
+
+      if (assignModal._dbInstance === 'form') {
+        await update(ref(formDb, `issue/${assignModal.id}`), data)
+      } else {
+        await updateDoc(doc(db, 'cases', assignModal.id), data)
+      }
+      
       setAssignModal(null)
       setSelectedVol('')
     } catch (err) {
@@ -96,11 +149,14 @@ export default function AdminPanel() {
     }
   }
 
-  const markComplete = async (caseId) => {
+  const markComplete = async (c) => {
     try {
-      await updateDoc(doc(db, 'cases', caseId), {
-        status: 'completed'
-      })
+      const data = { status: 'completed' }
+      if (c._dbInstance === 'form') {
+        await update(ref(formDb, `issue/${c.id}`), data)
+      } else {
+        await updateDoc(doc(db, 'cases', c.id), data)
+      }
     } catch (err) {
       console.error(err)
     }
@@ -175,6 +231,19 @@ export default function AdminPanel() {
           ))}
         </div>
 
+        {/* Tabs */}
+        <div className="source-tabs">
+          <button className={`tab-btn ${activeTab === 'web' ? 'active' : ''}`} onClick={() => setActiveTab('web')}>
+            🌐 Web Issues <span className="tab-count">{webCases.length}</span>
+          </button>
+          <button className={`tab-btn ${activeTab === 'form' ? 'active' : ''}`} onClick={() => setActiveTab('form')}>
+            📝 Google Form <span className="tab-count">{formCases.length}</span>
+          </button>
+          <button className={`tab-btn ${activeTab === 'whatsapp' ? 'active' : ''}`} onClick={() => setActiveTab('whatsapp')}>
+            💬 WhatsApp Bot <span className="tab-count">{whatsappCases.length}</span>
+          </button>
+        </div>
+
         {/* Table */}
         <div className="table-wrapper">
           <table className="data-table">
@@ -197,16 +266,16 @@ export default function AdminPanel() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(c => (
+              {(activeTab === 'web' ? webCases : activeTab === 'form' ? formCases : whatsappCases).map(c => (
                 <tr key={c.id}>
                   <td>
-                    <span>{PROBLEM_ICONS[c.problem_type]} {c.problem_type}</span>
+                    <span>{PROBLEM_ICONS[c.problem_type] || '📌'} {c.problem_type}</span>
                   </td>
                   <td>📍 {c.location}</td>
                   <td><span className={`badge badge-${c.priority}`}>{c.priority}</span></td>
-                  <td>👥 {c.people_affected}</td>
+                  <td>👥 {c.people_affected || 0}</td>
                   <td>
-                    <span className="score-chip">{c.priorityScore}</span>
+                    <span className="score-chip">{c.priorityScore || 0}</span>
                   </td>
                   <td>
                     <span className={`badge badge-${c.status === 'in_progress' ? 'inprogress' : c.status}`}>
@@ -226,7 +295,7 @@ export default function AdminPanel() {
                           <button className="btn btn-secondary btn-sm" onClick={() => { setAssignModal(c); setSelectedVol('') }}>
                             👤 Assign
                           </button>
-                          <button className="btn btn-success btn-sm" onClick={() => markComplete(c.id)}>
+                          <button className="btn btn-success btn-sm" onClick={() => markComplete(c)}>
                             ✅
                           </button>
                         </>
@@ -238,7 +307,7 @@ export default function AdminPanel() {
               ))}
             </tbody>
           </table>
-          {filtered.length === 0 && (
+          {(activeTab === 'web' ? webCases : activeTab === 'form' ? formCases : whatsappCases).length === 0 && (
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No cases match filters.</div>
           )}
         </div>

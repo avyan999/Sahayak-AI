@@ -2,7 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 import { collection, query, onSnapshot, orderBy, doc, updateDoc, getDocs, where } from 'firebase/firestore'
+import { ref, onValue, update } from 'firebase/database'
 import { db } from '../firebase'
+import { formDb } from '../formFirebase'
+import { DUMMY_REALTIME_CASES } from '../utils/dummyData'
 import './Dashboard.css'
 
 const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
@@ -15,66 +18,98 @@ const PROBLEM_ICONS = {
 export default function Dashboard() {
   const { user } = useAuth()
   const [cases, setCases] = useState([])
+  const [realtimeCases, setRealtimeCases] = useState([])
   const [stats, setStats] = useState({ total: 0, pending: 0, inprogress: 0, completed: 0 })
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState({ priority: 'all', status: 'all', search: '' })
   const [selectedCase, setSelectedCase] = useState(null)
   const [newCaseIds, setNewCaseIds] = useState(new Set())
+  const [activeTab, setActiveTab] = useState('web')
 
   useEffect(() => {
+    // 1. Firestore Cases (Web)
     const q = query(collection(db, 'cases'), orderBy('createdAt', 'desc'))
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const casesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      
-      // Detect new cases
-      if (!loading) {
-        snapshot.docChanges().forEach(change => {
-          if (change.type === 'added') {
-            const id = change.doc.id
-            setNewCaseIds(prev => new Set([...prev, id]))
-            setTimeout(() => {
-              setNewCaseIds(prev => {
-                const next = new Set(prev)
-                next.delete(id)
-                return next
-              })
-            }, 8000)
-          }
-        })
-      }
-
-      // Calculate stats
-      const newStats = { total: casesData.length, pending: 0, inprogress: 0, completed: 0 }
-      casesData.forEach(c => {
-        if (c.status === 'pending') newStats.pending++
-        if (c.status === 'in_progress') newStats.inprogress++
-        if (c.status === 'completed') newStats.completed++
-      })
-      
-      setStats(newStats)
-      setCases(casesData)
-      setLoading(false)
-    }, (err) => {
-      console.error(err)
-      setLoading(false)
+    const unsubFirestore = onSnapshot(q, (snap) => {
+      const data = snap.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        source: doc.data().source || 'web',
+        _dbInstance: 'firestore'
+      }))
+      setCases(data)
     })
 
-    return () => unsubscribe()
+    // 2. Realtime Database Cases (Form & WhatsApp)
+    const issueRef = ref(formDb, 'issue')
+    const unsubRealtime = onValue(issueRef, (snapshot) => {
+      const data = snapshot.val()
+      const list = data ? Object.entries(data).map(([id, val]) => ({
+        id,
+        ...val,
+        _dbInstance: 'form',
+        source: (val.source || 'form').toLowerCase(),
+        status: (val.status || 'pending').toLowerCase(),
+        priority: (val.priority || 'medium').toLowerCase(),
+        createdAt: val.createdAt || Date.now()
+      })) : [];
+      
+      setRealtimeCases([...list, ...DUMMY_REALTIME_CASES])
+    }, (err) => {
+      console.error("Realtime DB Error:", err);
+      setRealtimeCases(DUMMY_REALTIME_CASES)
+    })
+
+    return () => {
+      unsubFirestore()
+      unsubRealtime()
+    }
   }, [])
 
-  const filtered = cases
+  useEffect(() => {
+    const allCases = [...cases, ...realtimeCases]
+    const sorted = allCases.sort((a, b) => {
+      const getTime = (val) => {
+        if (!val) return 0;
+        if (val.toMillis) return val.toMillis();
+        if (typeof val === 'number') return val;
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? 0 : d.getTime();
+      };
+      return getTime(b.createdAt) - getTime(a.createdAt);
+    });
+
+    const newStats = { total: sorted.length, pending: 0, inprogress: 0, completed: 0 };
+    sorted.forEach(c => {
+      const status = (c.status || '').toLowerCase();
+      const normalizedStatus = status === 'in_progress' ? 'inprogress' : status;
+      if (normalizedStatus === 'pending') newStats.pending++;
+      if (normalizedStatus === 'inprogress') newStats.inprogress++;
+      if (normalizedStatus === 'completed') newStats.completed++;
+    });
+    setStats(newStats);
+    setLoading(false);
+  }, [cases, realtimeCases])
+
+  const allCases = [...cases, ...realtimeCases]
+  
+  const filtered = allCases
     .filter(c => {
-      if (filter.priority !== 'all' && c.priority !== filter.priority) return false
-      if (filter.status !== 'all') {
-        const normalizedStatus = c.status === 'in_progress' ? 'inprogress' : c.status
-        if (normalizedStatus !== filter.status) return false
-      }
+      const cPriority = (c.priority || '').toLowerCase()
+      const cStatus = (c.status || '').toLowerCase()
+      const normalizedStatus = cStatus === 'in_progress' ? 'inprogress' : cStatus
+
+      if (filter.priority !== 'all' && cPriority !== filter.priority) return false
+      if (filter.status !== 'all' && normalizedStatus !== filter.status) return false
       if (filter.search && !c.location?.toLowerCase().includes(filter.search.toLowerCase()) &&
           !c.problem_type?.toLowerCase().includes(filter.search.toLowerCase()) &&
           !c.description?.toLowerCase().includes(filter.search.toLowerCase())) return false
       return true
     })
     .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2))
+
+  const webCases = filtered.filter(c => (c.source || 'web') === 'web')
+  const formCases = filtered.filter(c => c.source === 'form')
+  const whatsappCases = filtered.filter(c => c.source === 'whatsapp')
 
   const STAT_CARDS = [
     { label: 'Total Cases', value: stats.total, icon: '📋', color: 'var(--accent-primary)' },
@@ -144,15 +179,31 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="cases-header">
-          <h2 className="section-heading">Cases ({filtered.length})</h2>
+        <div className="source-tabs">
+          <button className={`tab-btn ${activeTab === 'web' ? 'active' : ''}`} onClick={() => setActiveTab('web')}>
+            🌐 Web Issues <span className="tab-count">{webCases.length}</span>
+          </button>
+          <button className={`tab-btn ${activeTab === 'form' ? 'active' : ''}`} onClick={() => setActiveTab('form')}>
+            📝 Google Form <span className="tab-count">{formCases.length}</span>
+          </button>
+          <button className={`tab-btn ${activeTab === 'whatsapp' ? 'active' : ''}`} onClick={() => setActiveTab('whatsapp')}>
+            💬 WhatsApp Bot <span className="tab-count">{whatsappCases.length}</span>
+          </button>
         </div>
 
-        {filtered.length === 0 ? (
+        <div className="cases-header">
+          <h2 className="section-heading">
+            {activeTab === 'web' ? 'Web Platform Issues' : 
+             activeTab === 'form' ? 'Google Form Submissions' : 
+             'WhatsApp Bot Reports'}
+          </h2>
+        </div>
+
+        {(activeTab === 'web' ? webCases : activeTab === 'form' ? formCases : whatsappCases).length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">📭</div>
-            <h3>No cases found</h3>
-            <p className="text-muted">Try adjusting your filters or report a new issue.</p>
+            <h3>No cases found in this section</h3>
+            <p className="text-muted">Try adjusting your filters or check other tabs.</p>
           </div>
         ) : (
           <div className="table-wrapper stagger">
@@ -163,10 +214,11 @@ export default function Dashboard() {
                   <th>Location</th>
                   <th>Priority</th>
                   <th>Status</th>
+                  <th>Source</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(c => (
+                {(activeTab === 'web' ? webCases : activeTab === 'form' ? formCases : whatsappCases).map(c => (
                   <tr
                     key={c.id}
                     onClick={() => setSelectedCase(c)}
@@ -186,6 +238,11 @@ export default function Dashboard() {
                     <td>
                       <span className={`badge badge-${c.status === 'in_progress' ? 'inprogress' : c.status}`}>
                         {c.status === 'in_progress' ? 'In Progress' : c.status}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`source-badge source-${c.source || 'web'}`}>
+                        {(c.source || 'web') === 'whatsapp' ? '💬 WhatsApp' : (c.source || 'web') === 'form' ? '📝 Google Form' : '🌐 Web Form'}
                       </span>
                     </td>
                   </tr>
@@ -225,11 +282,19 @@ function CaseModal({ case: c, onClose, user }) {
     setActionLoading(true)
     try {
       const vol = volunteers.find(v => v.id === selectedVol)
-      await updateDoc(doc(db, 'cases', c.id), {
+      const data = {
         status: 'in_progress',
         assignedTo: selectedVol,
         assignedVolunteerName: vol?.name || 'Unknown'
-      })
+      }
+
+      if (c._dbInstance === 'form') {
+        // Realtime Database Update
+        await update(ref(formDb, `issue/${c.id}`), data)
+      } else {
+        // Firestore Update
+        await updateDoc(doc(db, 'cases', c.id), data)
+      }
       onClose()
     } catch (err) {
       console.error(err)
@@ -241,15 +306,25 @@ function CaseModal({ case: c, onClose, user }) {
   const markComplete = async () => {
     setActionLoading(true)
     try {
-      await updateDoc(doc(db, 'cases', c.id), {
-        status: 'completed'
-      })
+      const data = { status: 'completed' }
+      if (c._dbInstance === 'form') {
+        await update(ref(formDb, `issue/${c.id}`), data)
+      } else {
+        await updateDoc(doc(db, 'cases', c.id), data)
+      }
       onClose()
     } catch (err) {
       console.error(err)
     } finally {
       setActionLoading(false)
     }
+  }
+
+  const formatDate = (val) => {
+    if (!val) return '';
+    if (val.toMillis) return new Date(val.toMillis()).toLocaleString();
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? 'Recent' : d.toLocaleString();
   }
 
   return (
@@ -266,17 +341,20 @@ function CaseModal({ case: c, onClose, user }) {
             {c.status === 'in_progress' ? 'In Progress' : c.status}
           </span>
           <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-            Score: {c.priorityScore}
+            Score: {c.priorityScore || 0}
+          </span>
+          <span className={`source-badge source-${c.source || 'web'}`}>
+            {(c.source || 'web') === 'whatsapp' ? '💬 WhatsApp' : (c.source || 'web') === 'form' ? '📝 Google Form' : '🌐 Web Form'}
           </span>
         </div>
 
         <div className="modal-detail-grid">
-          <div className="detail-item"><span className="detail-label">Type</span><span className="detail-val">{PROBLEM_ICONS[c.problem_type]} {c.problem_type}</span></div>
+          <div className="detail-item"><span className="detail-label">Type</span><span className="detail-val">{PROBLEM_ICONS[c.problem_type] || '📌'} {c.problem_type}</span></div>
           <div className="detail-item"><span className="detail-label">Location</span><span className="detail-val">📍 {c.location}</span></div>
-          <div className="detail-item"><span className="detail-label">Affected</span><span className="detail-val">👥 {c.people_affected} people</span></div>
-          <div className="detail-item"><span className="detail-label">Urgency</span><span className="detail-val">⚡ {c.urgency}/5</span></div>
+          <div className="detail-item"><span className="detail-label">Affected</span><span className="detail-val">👥 {c.people_affected || 1} people</span></div>
+          <div className="detail-item"><span className="detail-label">Urgency</span><span className="detail-val">⚡ {c.urgency || 3}/5</span></div>
           {c.assignedVolunteerName && <div className="detail-item"><span className="detail-label">Volunteer</span><span className="detail-val">🙋 {c.assignedVolunteerName}</span></div>}
-          <div className="detail-item"><span className="detail-label">Reported</span><span className="detail-val">{c.createdAt ? new Date(c.createdAt.toMillis()).toLocaleString() : ''}</span></div>
+          <div className="detail-item"><span className="detail-label">Reported</span><span className="detail-val">{formatDate(c.createdAt)}</span></div>
         </div>
 
         {c.description && (
