@@ -193,35 +193,29 @@ npm run start
 
 ---
 
-# 👨‍💻 Team
+# 🤝 Team
 
 ## Binary Duo
 
 ### Team Leader
-
 Aryan Kumar Mishra
 
 ### Team Member
-
 Sweta Raj
 
 ---
 
 # 📹 Demo
 
-Live Demo
+🌐 **Live Demo:** **sahayakaii.netlify.app
 
-(Add Link)
 
-Demo Video
 
-(Add YouTube Link)
-
-GitHub Repository
-
-https://github.com/avyan999/Sahayak-AI
+💻 **GitHub Repository:** https://github.com/avyan999/Sahayak-AI
 
 ---
+
+## ⭐ If you found this project interesting, consider giving it a star on GitHub!
 
 
 Madhav Institute of Technology & Science
