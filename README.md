@@ -223,11 +223,6 @@ https://github.com/avyan999/Sahayak-AI
 
 ---
 
-# ❤️ Built for
-
-HackMatrix 2026
-
-IEEE Computer Society
 
 Madhav Institute of Technology & Science
 
